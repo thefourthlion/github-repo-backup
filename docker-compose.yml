@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  github-backup:
+    build: .
+    container_name: github-backup
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backups:/usr/src/app/backups
+    environment:
+      - BACKUP_DIR=/usr/src/app/backups
+      - BACKUP_INTERVAL_HOURS=${BACKUP_INTERVAL_HOURS:-0}
+      - PORT=3000
+    env_file:
+      - .env
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 
