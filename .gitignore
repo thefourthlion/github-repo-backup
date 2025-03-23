@@ -2,3 +2,7 @@
 /node_modules
 /github-backups
 /backups
+
+/manual-clone/node_modules
+/manual-clone/clone_repos.sh
+/manual-clone/.env

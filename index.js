@@ -294,4 +294,41 @@ async function main() {
     await performBackup();
 }
 
+async function generateCloneScript() {
+    try {
+        // GitHub API configuration
+        const token = process.env.GITHUB_TOKEN;
+        const config = {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        };
+
+        // Fetch all repositories
+        const response = await axios.get('https://api.github.com/user/repos', config);
+        const repos = response.data;
+
+        // Generate clone commands
+        let cloneScript = '#!/bin/bash\n\n';
+        repos.forEach(repo => {
+            const cloneUrl = repo.clone_url.replace('https://', 
+                `https://${token}@`);
+            cloneScript += `git clone ${cloneUrl}\n`;
+        });
+
+        // Write to clone-repos.sh
+        fs.writeFileSync('clone-repos.sh', cloneScript, 'utf8');
+        fs.chmodSync('clone-repos.sh', '755'); // Make the script executable
+        
+        console.log('Clone script generated successfully!');
+        console.log('Run ./clone-repos.sh to clone all repositories');
+
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+}
+
+generateCloneScript();
+
 main(); 
