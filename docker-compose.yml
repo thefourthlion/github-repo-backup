@@ -1,21 +1,16 @@
 services:
   github-backup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: github-backup
-    environment:
-      - PUID=99                  # Unraid default user ID
-      - PGID=100                 # Unraid default group ID
-      - TZ=America/New_York      # Set your timezone
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - BACKUP_DIR=/backups
-      - PORT=3007
+    build: .
+    container_name: github-backup-container
     volumes:
       - ./backups:/backups
       - ./.env:/app/.env:ro
     ports:
-      - 3007:3007
+      - "3007:3007"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - BACKUP_DIR=/backups
+      - PORT=3007
     restart: unless-stopped
     labels:
       - "com.unraid.container.icon=https://github.com/fluidicon.png"
