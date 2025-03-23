@@ -1,22 +1,29 @@
-version: '3.8'
-
 services:
   github-backup:
-    build: .
+    image: github-backup:latest
     container_name: github-backup
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backups:/usr/src/app/backups
     environment:
-      - BACKUP_DIR=/usr/src/app/backups
-      - BACKUP_INTERVAL_HOURS=${BACKUP_INTERVAL_HOURS:-0}
-      - PORT=3000
-    env_file:
-      - .env
+      - PUID=99                  # Unraid default user ID
+      - PGID=100                 # Unraid default group ID
+      - TZ=America/New_York      # Set your timezone
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - BACKUP_DIR=/backups
+      - PORT=3007
+    volumes:
+      - /mnt/user/appdata/github-backup:/backups   # Unraid appdata path
+      - /mnt/user/appdata/github-backup/.env:/app/.env:ro
+    ports:
+      - 3007:3007
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3" 
+    labels:
+      - "com.unraid.container.icon=https://github.com/fluidicon.png"
+      - "com.unraid.container.name=GitHub Backup"
+      - "com.unraid.container.description=Automated GitHub repository backup solution"
+
+volumes:
+  github_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${BACKUP_DIR}

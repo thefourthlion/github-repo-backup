@@ -10,6 +10,49 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const BACKUP_DIR = process.env.BACKUP_DIR;
 const PORT = process.env.PORT || 3000;
 
+// Add detailed directory checks at startup
+console.log('=== Environment Check ===');
+console.log('Current working directory:', process.cwd());
+console.log('Running as UID:', process.getuid());
+console.log('Running as GID:', process.getgid());
+console.log('BACKUP_DIR:', BACKUP_DIR);
+
+console.log('\n=== Directory Status ===');
+try {
+    // Check if directory exists
+    console.log('Directory exists:', fs.existsSync(BACKUP_DIR));
+    
+    // Try to list the directory contents
+    console.log('Directory contents:', fs.readdirSync(BACKUP_DIR));
+    
+    // Get directory permissions
+    const stats = fs.statSync(BACKUP_DIR);
+    console.log('Directory permissions:', {
+        mode: stats.mode.toString(8),
+        uid: stats.uid,
+        gid: stats.gid
+    });
+    
+    // Try to create a test file
+    const testFile = path.join(BACKUP_DIR, '.test-write');
+    console.log('\n=== Write Test ===');
+    console.log('Attempting to write test file:', testFile);
+    fs.writeFileSync(testFile, 'test');
+    console.log('Successfully wrote test file');
+    fs.unlinkSync(testFile);
+    console.log('Successfully removed test file');
+    
+} catch (error) {
+    console.log('\n=== Error Details ===');
+    console.log('Error name:', error.name);
+    console.log('Error message:', error.message);
+    console.log('Error code:', error.code);
+    console.log('Error syscall:', error.syscall);
+    console.log('Error path:', error.path);
+    console.log('Full error:', error);
+    process.exit(1);
+}
+
 if (!GITHUB_TOKEN) {
     console.error('Please set GITHUB_TOKEN in your .env file');
     process.exit(1);
@@ -72,6 +115,57 @@ app.post('/api/backup', async (req, res) => {
     }
 });
 
+// Add debug logging function
+function debugLog(message, data = null) {
+    const logMessage = `[DEBUG] ${message}`;
+    console.log(logMessage);
+    if (data) {
+        console.log(JSON.stringify(data, null, 2));
+    }
+}
+
+// Add these debug logs at the start
+debugLog('Starting application with environment variables:', {
+    GITHUB_TOKEN: GITHUB_TOKEN ? 'exists' : 'missing',
+    BACKUP_DIR: BACKUP_DIR,
+    PORT: PORT
+});
+
+// Add filesystem checks
+debugLog('Checking filesystem permissions...');
+try {
+    const stats = fs.statSync(BACKUP_DIR);
+    debugLog('Backup directory stats:', {
+        exists: fs.existsSync(BACKUP_DIR),
+        mode: stats.mode.toString(8),
+        uid: stats.uid,
+        gid: stats.gid,
+        isDirectory: stats.isDirectory()
+    });
+    
+    // Test write permissions
+    const testFile = path.join(BACKUP_DIR, '.test-write');
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    debugLog('Successfully wrote test file to backup directory');
+} catch (error) {
+    debugLog('Filesystem error:', {
+        error: error.message,
+        code: error.code,
+        syscall: error.syscall,
+        path: error.path
+    });
+}
+
+// Add process info
+debugLog('Process information:', {
+    pid: process.pid,
+    uid: process.getuid(),
+    gid: process.getgid(),
+    cwd: process.cwd(),
+    platform: process.platform
+});
+
 async function fetchRepositories() {
     let allRepos = [];
     let page = 1;
@@ -113,24 +207,34 @@ async function fetchRepositories() {
 async function cloneRepository(repo) {
     const repoPath = path.join(BACKUP_DIR, repo.name);
     
+    debugLog(`Starting clone/update for ${repo.name}`, {
+        repoPath,
+        exists: fs.existsSync(repoPath),
+        repoUrl: repo.clone_url
+    });
+    
     try {
         // Initialize git instance for each operation
         const git = simpleGit();
         
         if (fs.existsSync(repoPath)) {
-            console.log(`Updating ${repo.name}...`);
+            debugLog(`Updating ${repo.name}...`);
             const repoGit = simpleGit(repoPath);
             await repoGit.fetch(['--all']);
             const defaultBranch = repo.default_branch || 'main';
             await repoGit.pull('origin', defaultBranch);
-            console.log(`Updated ${repo.name}`);
+            debugLog(`Updated ${repo.name}`);
         } else {
-            console.log(`Cloning ${repo.name}...`);
+            debugLog(`Cloning ${repo.name}...`);
             await git.clone(repo.clone_url, repoPath);
-            console.log(`Cloned ${repo.name}`);
+            debugLog(`Cloned ${repo.name}`);
         }
     } catch (error) {
-        console.error(`Error with ${repo.name}:`, error.message);
+        debugLog(`Error with ${repo.name}:`, {
+            error: error.message,
+            code: error.code,
+            stack: error.stack
+        });
         // If directory exists but isn't a git repo or has issues, remove it and try again
         if (fs.existsSync(repoPath)) {
             try {
@@ -152,25 +256,30 @@ async function cloneRepository(repo) {
 }
 
 async function performBackup() {
+    debugLog('Starting backup process');
     backupStatus = 'running';
     backupError = null;
-    console.log('Starting GitHub repository backup...');
     
     try {
+        debugLog('Fetching repository list');
         const repositories = await fetchRepositories();
-        console.log(`Found ${repositories.length} repositories`);
+        debugLog(`Found ${repositories.length} repositories`);
 
         for (const repo of repositories) {
+            debugLog(`Processing repository: ${repo.name}`);
             await cloneRepository(repo);
         }
 
         lastBackup = new Date().toISOString();
         backupStatus = 'completed';
-        console.log('Backup completed!');
+        debugLog('Backup completed successfully');
     } catch (error) {
         backupStatus = 'error';
         backupError = error.message;
-        console.error('Backup failed:', error);
+        debugLog('Backup failed:', {
+            error: error.message,
+            stack: error.stack
+        });
         throw error;
     }
 }
