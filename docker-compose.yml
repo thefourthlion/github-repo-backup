@@ -1,6 +1,8 @@
 services:
   github-backup:
-    image: github-backup:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: github-backup
     environment:
       - PUID=99                  # Unraid default user ID
@@ -10,8 +12,8 @@ services:
       - BACKUP_DIR=/backups
       - PORT=3007
     volumes:
-      - /mnt/user/appdata/github-backup:/backups   # Unraid appdata path
-      - /mnt/user/appdata/github-backup/.env:/app/.env:ro
+      - ./backups:/backups
+      - ./.env:/app/.env:ro
     ports:
       - 3007:3007
     restart: unless-stopped
